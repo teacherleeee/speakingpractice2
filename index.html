@@ -2,12 +2,18 @@
 <style>
   h2.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   *{box-sizing:border-box;margin:0;padding:0}
-  body,div{font-family:var(--font-sans)}
-  .wrap{max-width:600px;margin:0 auto;padding:2rem 1rem 3rem}
+  .wrap{max-width:600px;margin:0 auto;padding:2rem 1rem 3rem;font-family:var(--font-sans)}
   .hero{text-align:center;margin-bottom:2rem}
   .hero-icon{font-size:2.5rem;display:block;margin-bottom:.5rem}
   .hero h1{font-size:22px;font-weight:500;color:var(--color-text-primary);margin-bottom:.25rem}
   .hero p{font-size:13px;color:var(--color-text-secondary)}
+  .voice-badge{
+    display:inline-block;margin-top:.5rem;padding:3px 10px;
+    font-size:11px;border-radius:var(--border-radius-md);
+    background:var(--color-background-secondary);
+    border:0.5px solid var(--color-border-tertiary);
+    color:var(--color-text-secondary);
+  }
   .list{display:flex;flex-direction:column;gap:10px}
   .q-btn{
     display:flex;align-items:center;gap:12px;
@@ -52,22 +58,15 @@
   }
   .stop-btn:hover{background:var(--color-background-primary)}
   .stop-btn:disabled{opacity:.4;cursor:default}
-  .speed-badge{
-    display:inline-block;margin-left:6px;padding:2px 8px;
-    font-size:11px;border-radius:var(--border-radius-md);
-    background:var(--color-background-secondary);
-    border:0.5px solid var(--color-border-tertiary);
-    color:var(--color-text-secondary);
-    vertical-align:middle;
-  }
 </style>
 
 <div class="wrap">
-  <h2 class="sr-only">영어 말하기 연습 — 17개 질문 버튼을 눌러 원어민 남성 목소리로 들어보세요</h2>
+  <h2 class="sr-only">영어 말하기 연습 — 17개 질문 버튼을 눌러 미국 영어 여성 목소리로 들어보세요</h2>
   <div class="hero">
     <span class="hero-icon">🎧</span>
-    <h1>영어 말하기 연습 <span class="speed-badge">× 0.75 천천히</span></h1>
+    <h1>영어 말하기 연습</h1>
     <p>버튼을 눌러 원어민 발음을 들어보세요</p>
+    <div class="voice-badge" id="vbadge">목소리 로딩 중...</div>
   </div>
 
   <div class="list" id="qlist"></div>
@@ -100,17 +99,37 @@ const questions=[
   "Say one sentence to offer help in this situation. I'm sleepy."
 ];
 
+let selectedVoice=null;
 let currentBtn=null;
 
-function getVoice(){
-  const voices=speechSynthesis.getVoices();
-  const maleKeywords=['david','daniel','alex','fred','mark','male','guy','bruce','jorge','diego','reed','thomas','aaron'];
-  const enVoices=voices.filter(v=>v.lang.startsWith('en'));
-  let picked=enVoices.find(v=>maleKeywords.some(k=>v.name.toLowerCase().includes(k)));
-  if(!picked)picked=enVoices.find(v=>!['samantha','victoria','moira','fiona','karen','female'].some(k=>v.name.toLowerCase().includes(k)));
-  if(!picked&&enVoices.length)picked=enVoices[0];
-  return picked||null;
+const femaleKeywords=['samantha','zira','google us english','susan','victoria','karen','moira','allison','ava','nicky','female'];
+const maleExcludes=['david','daniel','alex','fred','mark','jorge','diego','reed','thomas','aaron','bruce','male','guy'];
+
+function pickVoice(voices){
+  const enUS=voices.filter(v=>v.lang==='en-US'||v.lang==='en_US');
+  const enAll=voices.filter(v=>v.lang.startsWith('en'));
+
+  const tryFemale=(list)=>{
+    let v=list.find(v=>femaleKeywords.some(k=>v.name.toLowerCase().includes(k)));
+    if(!v)v=list.find(v=>!maleExcludes.some(k=>v.name.toLowerCase().includes(k)));
+    return v||null;
+  };
+
+  return tryFemale(enUS)||tryFemale(enAll)||(enUS[0]||enAll[0]||null);
 }
+
+function initVoice(){
+  const voices=speechSynthesis.getVoices();
+  if(voices.length){
+    selectedVoice=pickVoice(voices);
+    document.getElementById('vbadge').textContent=selectedVoice?`🎙 ${selectedVoice.name}`:'기본 목소리 사용';
+  }
+}
+
+speechSynthesis.onvoiceschanged=()=>{
+  if(!selectedVoice)initVoice();
+};
+initVoice();
 
 function setStatus(text,active){
   document.getElementById('stxt').textContent=text;
@@ -131,10 +150,9 @@ function speak(text,btn,idx){
 
   const utter=new SpeechSynthesisUtterance(text);
   utter.lang='en-US';
-  utter.rate=0.75;
+  utter.rate=1.0;
   utter.pitch=1.0;
-  const v=getVoice();
-  if(v)utter.voice=v;
+  if(selectedVoice)utter.voice=selectedVoice;
   utter.onend=()=>{clearBtn();setStatus('재생 완료',false);};
   utter.onerror=()=>{clearBtn();setStatus('재생 오류',false);};
   speechSynthesis.speak(utter);
@@ -148,6 +166,4 @@ questions.forEach((q,i)=>{
   btn.onclick=()=>speak(q,btn,i);
   list.appendChild(btn);
 });
-
-if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{};
 </script>
