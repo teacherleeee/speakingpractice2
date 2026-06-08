@@ -1,0 +1,169 @@
+
+<style>
+  h2.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  .wrap{max-width:600px;margin:0 auto;padding:2rem 1rem 3rem;font-family:var(--font-sans)}
+  .hero{text-align:center;margin-bottom:2rem}
+  .hero-icon{font-size:2.5rem;display:block;margin-bottom:.5rem}
+  .hero h1{font-size:22px;font-weight:500;color:var(--color-text-primary);margin-bottom:.25rem}
+  .hero p{font-size:13px;color:var(--color-text-secondary)}
+  .voice-badge{
+    display:inline-block;margin-top:.5rem;padding:3px 10px;
+    font-size:11px;border-radius:var(--border-radius-md);
+    background:var(--color-background-secondary);
+    border:0.5px solid var(--color-border-tertiary);
+    color:var(--color-text-secondary);
+  }
+  .list{display:flex;flex-direction:column;gap:10px}
+  .q-btn{
+    display:flex;align-items:center;gap:12px;
+    width:100%;padding:14px 16px;
+    background:var(--color-background-primary);
+    border:0.5px solid var(--color-border-tertiary);
+    border-radius:var(--border-radius-lg);
+    cursor:pointer;text-align:left;
+    transition:background .15s,border-color .15s,transform .1s;
+  }
+  .q-btn:hover{background:var(--color-background-secondary);border-color:var(--color-border-secondary)}
+  .q-btn:active{transform:scale(0.985)}
+  .q-btn.playing{border-color:var(--color-border-info);background:var(--color-background-info)}
+  .q-num{
+    font-size:11px;font-weight:500;min-width:22px;height:22px;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:50%;
+    background:var(--color-background-secondary);
+    color:var(--color-text-secondary);
+    flex-shrink:0;
+    border:0.5px solid var(--color-border-tertiary);
+  }
+  .q-btn.playing .q-num{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+  .q-text{font-size:14px;color:var(--color-text-primary);line-height:1.5;flex:1}
+  .q-icon{font-size:18px;color:var(--color-text-tertiary);flex-shrink:0}
+  .q-btn.playing .q-icon{color:var(--color-text-info)}
+  .status-bar{
+    margin-top:1.5rem;padding:10px 14px;
+    border-radius:var(--border-radius-md);
+    background:var(--color-background-secondary);
+    border:0.5px solid var(--color-border-tertiary);
+    font-size:12px;color:var(--color-text-secondary);
+    display:flex;align-items:center;gap:8px;
+  }
+  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--color-border-secondary);flex-shrink:0}
+  .status-dot.active{background:#1D9E75}
+  .stop-btn{
+    margin-left:auto;padding:3px 10px;font-size:11px;
+    border:0.5px solid var(--color-border-secondary);
+    border-radius:var(--border-radius-md);
+    background:transparent;cursor:pointer;color:var(--color-text-secondary);
+  }
+  .stop-btn:hover{background:var(--color-background-primary)}
+  .stop-btn:disabled{opacity:.4;cursor:default}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">영어 말하기 연습 — 17개 질문 버튼을 눌러 미국 영어 여성 목소리로 들어보세요</h2>
+  <div class="hero">
+    <span class="hero-icon">🎧</span>
+    <h1>영어 말하기 연습</h1>
+    <p>버튼을 눌러 원어민 발음을 들어보세요</p>
+    <div class="voice-badge" id="vbadge">목소리 로딩 중...</div>
+  </div>
+
+  <div class="list" id="qlist"></div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="sdot"></div>
+    <span id="stxt">재생 대기 중</span>
+    <button class="stop-btn" id="stopbtn" onclick="stopAll()" disabled>정지</button>
+  </div>
+</div>
+
+<script>
+const questions=[
+  "Are you worried about anything in high school?",
+  "Is there anything you are happy about these days?",
+  "What made you sad recently?",
+  "I think students need more time to rest. What do you think?",
+  "I think reading books is important. What do you think?",
+  "I think students should use smartphones less. What do you think?",
+  "I think homework is necessary. What do you think?",
+  "Say how to ask which of the two someone prefers.",
+  "Say how to ask for an explanation.",
+  "Say an expression that introduces this person.",
+  "Say an expression that asks for a reason.",
+  "Say an expression that asks about something this tourist is curious about.",
+  "Say one sentence to offer help in this situation. I'm thirsty.",
+  "Say one sentence to offer help in this situation. I'm bored.",
+  "Say one sentence to offer help in this situation. I'm tired.",
+  "Say one sentence to offer help in this situation. I'm hungry.",
+  "Say one sentence to offer help in this situation. I'm sleepy."
+];
+
+let selectedVoice=null;
+let currentBtn=null;
+
+const femaleKeywords=['samantha','zira','google us english','susan','victoria','karen','moira','allison','ava','nicky','female'];
+const maleExcludes=['david','daniel','alex','fred','mark','jorge','diego','reed','thomas','aaron','bruce','male','guy'];
+
+function pickVoice(voices){
+  const enUS=voices.filter(v=>v.lang==='en-US'||v.lang==='en_US');
+  const enAll=voices.filter(v=>v.lang.startsWith('en'));
+
+  const tryFemale=(list)=>{
+    let v=list.find(v=>femaleKeywords.some(k=>v.name.toLowerCase().includes(k)));
+    if(!v)v=list.find(v=>!maleExcludes.some(k=>v.name.toLowerCase().includes(k)));
+    return v||null;
+  };
+
+  return tryFemale(enUS)||tryFemale(enAll)||(enUS[0]||enAll[0]||null);
+}
+
+function initVoice(){
+  const voices=speechSynthesis.getVoices();
+  if(voices.length){
+    selectedVoice=pickVoice(voices);
+    document.getElementById('vbadge').textContent=selectedVoice?`🎙 ${selectedVoice.name}`:'기본 목소리 사용';
+  }
+}
+
+speechSynthesis.onvoiceschanged=()=>{
+  if(!selectedVoice)initVoice();
+};
+initVoice();
+
+function setStatus(text,active){
+  document.getElementById('stxt').textContent=text;
+  document.getElementById('sdot').className='status-dot'+(active?' active':'');
+  document.getElementById('stopbtn').disabled=!active;
+}
+
+function clearBtn(){if(currentBtn){currentBtn.classList.remove('playing');currentBtn=null;}}
+
+function stopAll(){speechSynthesis.cancel();clearBtn();setStatus('재생 대기 중',false);}
+
+function speak(text,btn,idx){
+  speechSynthesis.cancel();
+  clearBtn();
+  btn.classList.add('playing');
+  currentBtn=btn;
+  setStatus(`Q${idx+1} 재생 중…`,true);
+
+  const utter=new SpeechSynthesisUtterance(text);
+  utter.lang='en-US';
+  utter.rate=1.0;
+  utter.pitch=1.0;
+  if(selectedVoice)utter.voice=selectedVoice;
+  utter.onend=()=>{clearBtn();setStatus('재생 완료',false);};
+  utter.onerror=()=>{clearBtn();setStatus('재생 오류',false);};
+  speechSynthesis.speak(utter);
+}
+
+const list=document.getElementById('qlist');
+questions.forEach((q,i)=>{
+  const btn=document.createElement('button');
+  btn.className='q-btn';
+  btn.innerHTML=`<span class="q-num">${i+1}</span><span class="q-text">${q}</span><i class="ti ti-volume q-icon" aria-hidden="true"></i>`;
+  btn.onclick=()=>speak(q,btn,i);
+  list.appendChild(btn);
+});
+</script>
